@@ -539,19 +539,21 @@ def print_logo(tagline=True, compact=False, animated=False, minimal=False):
         sys.stdout.write(C.R)
         return
     
-    # Full logo (imperial gradient by line)
-    line_colors = [C.W, C.W, C.G1, C.G1, C.G2, C.G2]
+    # Full logo — NOVA: gold gradient (bright top → dark bottom), CLI: pure white
+    nova_colors = [
+        _e("38;5;180"),  # line 0 — Champagne (brightest)
+        _e("38;5;179"),  # line 1 — Gold
+        _e("38;5;178"),  # line 2 — Amber
+        _e("38;5;172"),  # line 3 — Deep amber
+        _e("38;5;136"),  # line 4 — Matte bronze
+        _e("38;5;94"),   # line 5 — Dark bronze (darkest)
+    ]
     for i in range(6):
-        line_color = line_colors[i]
-        line = line_color + C.BOLD + _NOVA_BLOCK[i] + _CLI_BLOCK[i]
-
-        # Premium star on designated line
-        if i == _STAR_LINE:
-            line += "  " + line_color + "✦"
-        else:
-            line += "   "
-
-        print(line + C.R)
+        nova_color = nova_colors[i]
+        nova_part = nova_color + C.BOLD + _NOVA_BLOCK[i]
+        cli_part  = C.W + C.BOLD + _CLI_BLOCK[i]
+        star_part = ("  " + nova_color + "✦") if i == _STAR_LINE else "   "
+        print(nova_part + cli_part + star_part + C.R)
         
         if animated:
             time.sleep(0.04)
@@ -1075,7 +1077,6 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
         """Render the selector."""
         nonlocal scroll_offset
         filtered = get_filtered_indices()
-        _render_reset()
         
         # Adjust scroll
         if filtered:
@@ -1088,20 +1089,8 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
         # Calculate lines to clear
         lines_per_opt = 2 if descriptions else 1
         visible_opts = min(len(filtered), page_size)
-        scroll_lines = 0
-        if scroll_offset > 0:
-            scroll_lines += 1
-        if scroll_offset + page_size < len(filtered):
-            scroll_lines += 1
-        
-        total_lines = (
-            (1 if title else 0) +
-            (1 if allow_filter else 0) +
-            1 +  # spacer line after title/filter
-            (visible_opts * lines_per_opt) +
-            scroll_lines +
-            1    # trailing spacer line
-        )
+        header_lines = (1 if title else 0) + (1 if allow_filter else 0) + 1
+        total_lines = header_lines + (visible_opts * lines_per_opt) + 2
         
         out = []
         
@@ -1110,12 +1099,12 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
         
         # Title
         if title:
-            out.append("  " + q(C.W, title) + "\n")
+            out.append("  " + q(C.G2, title) + "\n")
         
         # Filter input
         if allow_filter:
-            filter_display = filter_text if filter_text else q(C.W, "type to filter...")
-            out.append("  " + q(C.W, "/") + " " + filter_display + "\n")
+            filter_display = filter_text if filter_text else q(C.G3, "type to filter...")
+            out.append("  " + q(C.B6, "/") + " " + filter_display + "\n")
         
         out.append("\n")
         
@@ -1129,24 +1118,25 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
             # Index prefix
             idx_str = ""
             if show_index:
-                idx_str = q(C.W, f"[{opt_idx + 1}]") + "  "
+                idx_str = q(C.G3, f"[{opt_idx + 1}]") + "  "
             
             if is_selected:
-                out.append("  " + q(C.G1, ">", bold=True) + "  " + idx_str +
+                out.append("  " + q(C.B6, "▸", bold=True) + "  " + idx_str +
                            q(C.W, opt, bold=True) + "\n")
             else:
-                out.append("     " + idx_str + q(C.W, opt) + "\n")
+                out.append("     " + idx_str + q(C.G2, opt) + "\n")
             
             # Description
             if descriptions and opt_idx < len(descriptions) and descriptions[opt_idx]:
                 desc = descriptions[opt_idx]
-                out.append("       " + q(C.W, desc) + "\n")
+                desc_color = C.G2 if is_selected else C.G3
+                out.append("       " + q(desc_color, desc) + "\n")
         
         # Scroll indicators
         if scroll_offset > 0:
-            out.append("       " + q(C.W, "↑ more above") + "\n")
+            out.append("       " + q(C.G3, "↑ more above") + "\n")
         if scroll_offset + page_size < len(filtered):
-            out.append("       " + q(C.W, "↓ more below") + "\n")
+            out.append("       " + q(C.G3, "↓ more below") + "\n")
         
         out.append("\n")
         
@@ -1261,27 +1251,26 @@ def _raw_input_unix():
         def __init__(self):
             self.fd = sys.stdin.fileno()
             self.old = termios.tcgetattr(self.fd)
-            tty.setraw(self.fd)
-            new = termios.tcgetattr(self.fd)
-            new[6][termios.VMIN] = 0
-            new[6][termios.VTIME] = 1
-            termios.tcsetattr(self.fd, termios.TCSADRAIN, new)
 
         def read_key(self):
-            data = sys.stdin.read(3)
-            if not data:
-                return ""
-            if data == "\x1b[A":
-                return "UP"
-            if data == "\x1b[B":
-                return "DOWN"
-            if data == "\x1b[C":
-                return "RIGHT"
-            if data == "\x1b[D":
-                return "LEFT"
-            if data.startswith("\x1b"):
-                return "ESC"
-            return data[0]
+            # setraw per-keypress, restore immediately after
+            tty.setraw(self.fd)
+            try:
+                ch = sys.stdin.read(1)
+                if ch == "\x1b":
+                    ch2 = sys.stdin.read(1)
+                    if ch2 == "[":
+                        ch3 = sys.stdin.read(1)
+                        if   ch3 == "A": return "UP"
+                        elif ch3 == "B": return "DOWN"
+                        elif ch3 == "C": return "RIGHT"
+                        elif ch3 == "D": return "LEFT"
+                        return ch3
+                    return ch2
+                return ch
+            finally:
+                termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
+
 
         def close(self):
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
@@ -1297,42 +1286,64 @@ def _raw_input_unix():
 
 def _select_unix(options, draw, current, get_filtered, page_size, allow_filter):
     """Unix/Mac key handling with proper terminal restoration."""
+    import termios
+    import tty
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+
+    def read_key():
+        """Read single keypress, set raw only for the duration."""
+        tty.setraw(fd)
+        try:
+            ch = sys.stdin.read(1)
+            if ch == "\x1b":  # Escape sequence
+                ch2 = sys.stdin.read(1)
+                if ch2 == "[":
+                    ch3 = sys.stdin.read(1)
+                    if ch3 == "A": return "UP"
+                    if ch3 == "B": return "DOWN"
+                    if ch3 == "C": return "RIGHT"
+                    if ch3 == "D": return "LEFT"
+                    return ch3
+                return ch2
+            return ch
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
     draw(first=True)
 
-    with _raw_input_unix() as raw:
-        while True:
-            key = raw.read_key()
-            if not key:
-                continue
-            filtered = get_filtered()
+    while True:
+        key = read_key()
+        filtered = get_filtered()
 
-            if key in ("\r", "\n"):
-                return current
+        if key in ("\r", "\n"):
+            return current
 
-            if key == "\x03":  # Ctrl+C
-                raise KeyboardInterrupt
+        if key == "\x03":  # Ctrl+C
+            raise KeyboardInterrupt
 
-            if key == "UP" or key in ("k", "K"):
-                if current in filtered:
-                    idx = filtered.index(current)
-                    if idx > 0:
-                        current = filtered[idx - 1]
-                draw()
+        if key == "UP" or key in ("k", "K"):
+            if current in filtered:
+                idx = filtered.index(current)
+                if idx > 0:
+                    current = filtered[idx - 1]
+            draw()
 
-            elif key == "DOWN" or key in ("j", "J"):
-                if current in filtered:
-                    idx = filtered.index(current)
-                    if idx < len(filtered) - 1:
-                        current = filtered[idx + 1]
-                draw()
+        elif key == "DOWN" or key in ("j", "J"):
+            if current in filtered:
+                idx = filtered.index(current)
+                if idx < len(filtered) - 1:
+                    current = filtered[idx + 1]
+            draw()
 
-            elif key.isdigit():
-                idx = int(key) - 1
-                if 0 <= idx < len(options):
-                    return idx
+        elif key.isdigit():
+            idx = int(key) - 1
+            if 0 <= idx < len(options):
+                return idx
 
-            elif key == "q":
-                raise KeyboardInterrupt
+        elif key == "q":
+            raise KeyboardInterrupt
 
 
 def _select_multi(options, title="", selected=None, descriptions=None):
@@ -2105,7 +2116,7 @@ def check_for_updates(force=False):
     
     try:
         req = urllib.request.Request(
-            "https://api.github.com/repos/Nova/nova-os/releases/latest",
+            "https://api.github.com/repos/sxrubyo/nova-os/releases/latest",
             headers={
                 "User-Agent": f"nova-cli/{NOVA_VERSION}",
                 "Accept": "application/vnd.github.v3+json",
@@ -3159,7 +3170,7 @@ def cmd_init(args):
     print("  " + q(C.W, f"  {L['apikey_sub']}"))
     print()
     print("  " + q(C.W, "  Docs: ") +
-          q(C.W, "https://github.com/Nova/nova-os", underline=True))
+          q(C.W, "https://github.com/sxrubyo/nova-os", underline=True))
     print()
     
     existing_key = cfg.get("api_key", "") or get_active_key()
@@ -5676,7 +5687,7 @@ def _config_about():
     kv("Config", str(CONFIG_FILE), C.G3)
     
     print()
-    kv("Documentation", "https://github.com/Nova/nova-os", C.B7)
+    kv("Documentation", "https://github.com/sxrubyo/nova-os", C.B7)
     kv("Support", "https://nova-os.com/support", C.B7)
     kv("Terms", "https://nova-os.com/terms", C.G3)
     
@@ -5835,7 +5846,7 @@ def cmd_help(args=None):
     
     # Links
     print("  " + q(C.W, "Docs: ") + 
-          q(C.W, "https://github.com/Nova/nova-os", underline=True))
+          q(C.W, "https://github.com/sxrubyo/nova-os", underline=True))
     print()
 
 

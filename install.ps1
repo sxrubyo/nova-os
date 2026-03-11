@@ -1,35 +1,31 @@
 # nova CLI — Windows Installer
-# Maintained by Nova Governance
-# irm https://raw.githubusercontent.com/Nova/nova-os/main/install.ps1 | iex
+# irm https://raw.githubusercontent.com/sxrubyo/nova-os/main/install.ps1 | iex
 $ErrorActionPreference = "Stop"
 $NOVA_VERSION = "3.1.5"
 $NOVA_DIR = "$env:USERPROFILE\.nova"
 $NOVA_PY  = "$NOVA_DIR\nova.py"
 $NOVA_CMD = "$NOVA_DIR\nova.cmd"
-$NOVA_PY_URL = "https://raw.githubusercontent.com/Nova/nova-os/main/nova.py"
+$NOVA_PY_URL = "https://raw.githubusercontent.com/sxrubyo/nova-os/main/nova.py"
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
+Clear-Host; Write-Host ""
 
-Clear-Host
-Write-Host ""
-Write-Host "  ███╗   ██╗  ██████╗  ██╗   ██╗  █████╗   ██████╗██╗     ██╗" -ForegroundColor DarkBlue
-Write-Host "  ████╗  ██║ ██╔═══██╗ ██║   ██║ ██╔══██╗ ██╔════╝██║     ██║" -ForegroundColor DarkBlue
-Write-Host "  ██╔██╗ ██║ ██║   ██║ ██║   ██║ ███████║ ██║     ██║     ██║" -ForegroundColor Blue
-Write-Host "  ██║╚██╗██║ ██║   ██║ ╚██╗ ██╔╝ ██╔══██║ ██║     ██║     ██║" -ForegroundColor Cyan
-Write-Host "  ██║ ╚████║ ╚██████╔╝  ╚████╔╝  ██║  ██║ ╚██████╗███████╗██║" -ForegroundColor Cyan
-Write-Host "  ╚═╝  ╚═══╝  ╚═════╝    ╚═══╝   ╚═╝  ╚═╝  ╚══════╝╚══════╝╚═╝" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  Agents that answer for themselves." -ForegroundColor DarkGray
-Write-Host "  ──────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
+# NOVA = gold gradient (bright→dark), CLI = white
+Write-Host "  ███╗   ██╗  ██████╗  ██╗   ██╗  █████╗  " -ForegroundColor Yellow     -NoNewline; Write-Host " ██████╗██╗     ██╗" -ForegroundColor White
+Write-Host "  ████╗  ██║ ██╔═══██╗ ██║   ██║ ██╔══██╗ " -ForegroundColor Yellow     -NoNewline; Write-Host "██╔════╝██║     ██║" -ForegroundColor White
+Write-Host "  ██╔██╗ ██║ ██║   ██║ ██║   ██║ ███████║ " -ForegroundColor DarkYellow  -NoNewline; Write-Host "██║     ██║     ██║" -ForegroundColor White
+Write-Host "  ██║╚██╗██║ ██║   ██║ ╚██╗ ██╔╝ ██╔══██║ " -ForegroundColor DarkYellow  -NoNewline; Write-Host "██║     ██║     ██║" -ForegroundColor White
+Write-Host "  ██║ ╚████║ ╚██████╔╝  ╚████╔╝  ██║  ██║ " -ForegroundColor DarkRed     -NoNewline; Write-Host "╚██████╗███████╗██║" -ForegroundColor White
+Write-Host "  ╚═╝  ╚═══╝  ╚═════╝    ╚═══╝   ╚═╝  ╚═╝ " -ForegroundColor DarkRed    -NoNewline; Write-Host " ╚═════╝╚══════╝╚═╝" -ForegroundColor White
+Write-Host ""; Write-Host "  Agents that answer for themselves." -ForegroundColor DarkGray
+Write-Host "  ──────────────────────────────────────────────────────" -ForegroundColor DarkGray; Write-Host ""
 
 function ok($m)   { Write-Host "  " -NoNewline; Write-Host "+" -ForegroundColor Green -NoNewline; Write-Host "  $m" -ForegroundColor White }
 function fail($m) { Write-Host "  " -NoNewline; Write-Host "x" -ForegroundColor Red   -NoNewline; Write-Host "  $m" -ForegroundColor White; exit 1 }
 function step($m) { Write-Host "  " -NoNewline; Write-Host "o" -ForegroundColor Blue  -NoNewline; Write-Host "  $m" -ForegroundColor DarkGray }
 
-Write-Host "  Installing nova CLI $NOVA_VERSION" -ForegroundColor White
-Write-Host ""
+Write-Host "  Installing nova CLI $NOVA_VERSION" -ForegroundColor White; Write-Host ""
 
 $PYTHON = $null
 foreach ($cmd in @("py","python","python3")) {
@@ -42,42 +38,28 @@ foreach ($cmd in @("py","python","python3")) {
 }
 if (-not $PYTHON) { fail "Python 3.8+ not found. Install from https://python.org" }
 
-if (Test-Path $NOVA_DIR) {
-    step "Removing previous installation..."
-    Remove-Item -Recurse -Force $NOVA_DIR
-}
-New-Item -ItemType Directory -Path $NOVA_DIR -Force | Out-Null
-ok "Directory ready"
+if (Test-Path $NOVA_DIR) { step "Removing previous installation..."; Remove-Item -Recurse -Force $NOVA_DIR }
+New-Item -ItemType Directory -Path $NOVA_DIR -Force | Out-Null; ok "Directory ready"
 step "Fetching nova.py..."
 
-try {
-    Invoke-WebRequest -UseBasicParsing -Uri $NOVA_PY_URL -OutFile $NOVA_PY
-} catch {
-    fail "Failed to download nova.py. Check your network connection."
-}
+try { Invoke-WebRequest -UseBasicParsing -Uri $NOVA_PY_URL -OutFile $NOVA_PY }
+catch { fail "Failed to download nova.py. Check your network." }
 
 $raw = Get-Content -Path $NOVA_PY -Raw
-if ($raw -notmatch "Nova CLI") {
-    fail "Downloaded nova.py looks invalid."
-}
-
+if ($raw -notmatch "Nova CLI") { fail "Downloaded nova.py looks invalid." }
 ok "nova.py ready"
 
 "@echo off`r`n$PYTHON `"$NOVA_PY`" %*`r`n" | Set-Content -Path $NOVA_CMD -Encoding ASCII
 ok "nova command created"
 
-$pathUser = [Environment]::GetEnvironmentVariable("Path", "User")
+$pathUser = [Environment]::GetEnvironmentVariable("Path","User")
 if ($pathUser -notmatch [regex]::Escape($NOVA_DIR)) {
-    [Environment]::SetEnvironmentVariable("Path", "$pathUser;$NOVA_DIR", "User")
-    ok "PATH updated"
+    [Environment]::SetEnvironmentVariable("Path","$pathUser;$NOVA_DIR","User"); ok "PATH updated"
 }
-
 $env:Path = "$env:Path;$NOVA_DIR"
 
-Write-Host ""
-Write-Host "  ──────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host ""; Write-Host "  ──────────────────────────────────────────────────────" -ForegroundColor DarkGray
 Write-Host "  nova CLI installed." -ForegroundColor White
-Write-Host "  ──────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
+Write-Host "  ──────────────────────────────────────────────────────" -ForegroundColor DarkGray; Write-Host ""
 
 & $PYTHON $NOVA_PY init

@@ -1,26 +1,29 @@
 #!/usr/bin/env bash
 # nova CLI — Linux / macOS Installer
-# Maintained by Nova Governance
-# curl -sSL https://raw.githubusercontent.com/Nova/nova-os/main/install.sh | bash
+# curl -sSL https://raw.githubusercontent.com/sxrubyo/nova-os/main/install.sh | bash
 set -euo pipefail
 
 NOVA_VERSION="3.1.5"
 NOVA_DIR="$HOME/.nova"
 NOVA_PY="$NOVA_DIR/nova.py"
 NOVA_BIN="$NOVA_DIR/nova"
-NOVA_PY_URL="https://raw.githubusercontent.com/Nova/nova-os/main/nova.py"
+NOVA_PY_URL="https://raw.githubusercontent.com/sxrubyo/nova-os/main/nova.py"
 
 R='\033[38;5;196m'; G='\033[38;5;84m'; B='\033[38;5;39m'
 D='\033[38;5;238m'; W='\033[38;5;255m'; Y='\033[38;5;244m'
 BLD='\033[1m'; RST='\033[0m'
 
+# NOVA gold gradient (bright→dark), CLI white
+N1='\033[38;5;180m'; N2='\033[38;5;179m'; N3='\033[38;5;178m'
+N4='\033[38;5;172m'; N5='\033[38;5;136m'; N6='\033[38;5;94m'
+
 clear; echo ""
-printf "${BLD}\033[38;5;18m  ███╗   ██╗  ██████╗  ██╗   ██╗  █████╗   ██████╗██╗     ██╗${RST}\n"
-printf "${BLD}\033[38;5;20m  ████╗  ██║ ██╔═══██╗ ██║   ██║ ██╔══██╗ ██╔════╝██║     ██║${RST}\n"
-printf "${BLD}\033[38;5;21m  ██╔██╗ ██║ ██║   ██║ ██║   ██║ ███████║ ██║     ██║     ██║${RST}\n"
-printf "${BLD}\033[38;5;33m  ██║╚██╗██║ ██║   ██║ ╚██╗ ██╔╝ ██╔══██║ ██║     ██║     ██║${RST}\n"
-printf "${BLD}\033[38;5;39m  ██║ ╚████║ ╚██████╔╝  ╚████╔╝  ██║  ██║ ╚██████╗███████╗██║${RST}\n"
-printf "${BLD}\033[38;5;45m  ╚═╝  ╚═══╝  ╚═════╝    ╚═══╝   ╚═╝  ╚═╝  ╚══════╝╚══════╝╚═╝${RST}\n"
+printf "${BLD}${N1}  ███╗   ██╗  ██████╗  ██╗   ██╗  █████╗  ${W} ██████╗██╗     ██╗${RST}\n"
+printf "${BLD}${N2}  ████╗  ██║ ██╔═══██╗ ██║   ██║ ██╔══██╗ ${W}██╔════╝██║     ██║${RST}\n"
+printf "${BLD}${N3}  ██╔██╗ ██║ ██║   ██║ ██║   ██║ ███████║ ${W}██║     ██║     ██║${RST}\n"
+printf "${BLD}${N4}  ██║╚██╗██║ ██║   ██║ ╚██╗ ██╔╝ ██╔══██║ ${W}██║     ██║     ██║${RST}\n"
+printf "${BLD}${N5}  ██║ ╚████║ ╚██████╔╝  ╚████╔╝  ██║  ██║ ${W}╚██████╗███████╗██║${RST}\n"
+printf "${BLD}${N6}  ╚═╝  ╚═══╝  ╚═════╝    ╚═══╝   ╚═╝  ╚═╝ ${W} ╚═════╝╚══════╝╚═╝${RST}\n"
 echo ""; printf "  ${Y}Agents that answer for themselves.${RST}\n"
 printf "  ${D}──────────────────────────────────────────────────────${RST}\n\n"
 
@@ -49,25 +52,13 @@ mkdir -p "$NOVA_DIR"; ok "Directory ready"
 step "Fetching nova.py..."
 
 fetch() {
-    if command -v curl &>/dev/null; then
-        curl -fsSL "$NOVA_PY_URL" -o "$NOVA_PY"
-        return $?
-    fi
-    if command -v wget &>/dev/null; then
-        wget -qO "$NOVA_PY" "$NOVA_PY_URL"
-        return $?
-    fi
+    if command -v curl &>/dev/null; then curl -fsSL "$NOVA_PY_URL" -o "$NOVA_PY"; return $?; fi
+    if command -v wget &>/dev/null; then wget -qO "$NOVA_PY" "$NOVA_PY_URL"; return $?; fi
     return 1
 }
 
-if ! fetch; then
-    fail "Failed to download nova.py. Check your network connection."
-fi
-
-if ! grep -q "Nova CLI" "$NOVA_PY" 2>/dev/null; then
-    fail "Downloaded nova.py looks invalid."
-fi
-
+if ! fetch; then fail "Failed to download nova.py. Check your network."; fi
+if ! grep -q "Nova CLI" "$NOVA_PY" 2>/dev/null; then fail "Downloaded nova.py looks invalid."; fi
 ok "nova.py ready"
 
 printf '#!/usr/bin/env bash\nexec '"$PYTHON"' "'"$NOVA_PY"'" "$@"\n' > "$NOVA_BIN"
@@ -79,11 +70,10 @@ for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile"; do
         echo 'export PATH="$HOME/.nova:$PATH"' >> "$rc"; ok "PATH updated in $rc"; break
     fi
 done
-
 export PATH="$HOME/.nova:$PATH"
 
 echo ""; printf "  ${D}──────────────────────────────────────────────────────${RST}\n"
 printf "  ${W}nova CLI installed.${RST}\n"
 printf "  ${D}──────────────────────────────────────────────────────${RST}\n\n"
 
-exec "$PYTHON" "$NOVA_PY" init
+exec "$PYTHON" "$NOVA_PY" init </dev/tty
