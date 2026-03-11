@@ -30,5 +30,5 @@ If you encounter a flaw, please open an **Issue** including:
 Do you have an idea for a new CRM integration or a payment gateway "Skill"? Suggestions for expanding the **Constellation** are always welcome.
 
 ---
-**Executive Contact:** `enterprise@nova-os.com`  
+**Executive Contact:** `sxrubyo@gmail.com`  
 *Building the nervous system of AI together.*
