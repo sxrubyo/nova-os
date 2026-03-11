@@ -1151,12 +1151,61 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
         sys.stdout.write("".join(out))
         sys.stdout.flush()
     
-    # Platform-specific key reading
+    # Key reading — inline so `current` stays in _select scope
     if IS_WINDOWS:
         return _select_windows(options, draw, current, get_filtered_indices, page_size)
-    else:
-        return _select_unix(options, draw, current, get_filtered_indices, page_size, 
-                           allow_filter)
+
+    # Unix inline loop
+    import termios, tty
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+
+    def read_key():
+        tty.setraw(fd)
+        try:
+            ch = sys.stdin.read(1)
+            if ch == "\x1b":
+                ch2 = sys.stdin.read(1)
+                if ch2 == "[":
+                    ch3 = sys.stdin.read(1)
+                    if ch3 == "A": return "UP"
+                    if ch3 == "B": return "DOWN"
+                    if ch3 == "C": return "RIGHT"
+                    if ch3 == "D": return "LEFT"
+                    return ch3
+                return ch2
+            return ch
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+    draw(first=True)
+
+    while True:
+        key = read_key()
+        filtered = get_filtered_indices()
+
+        if key in ("\r", "\n"):
+            return current
+        if key == "\x03":
+            raise KeyboardInterrupt
+        if key == "UP" or key == "k" or key == "K":
+            if current in filtered:
+                idx = filtered.index(current)
+                if idx > 0:
+                    current = filtered[idx - 1]
+            draw()
+        elif key == "DOWN" or key == "j" or key == "J":
+            if current in filtered:
+                idx = filtered.index(current)
+                if idx < len(filtered) - 1:
+                    current = filtered[idx + 1]
+            draw()
+        elif key.isdigit():
+            idx = int(key) - 1
+            if 0 <= idx < len(options):
+                return idx
+        elif key == "q":
+            raise KeyboardInterrupt
 
 
 def _select_fallback(options, title, default, descriptions, show_index):
