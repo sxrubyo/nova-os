@@ -1,26 +1,26 @@
 # 🤝 Contributing to Nova OS
 **Maintained by @sxrubyo**
 
-Thank you for your interest in strengthening Nova! We are building the industry-standard infrastructure for AI agent governance. We value every contribution that aligns with our vision of absolute security and high-performance execution.
+Thank you for your interest in strengthening Nova. We are building industry-grade infrastructure for AI agent governance, and we value contributions that advance security, performance, and clarity.
 
 ## ⚖️ Our Philosophy
-- **Zero Dependencies**: Nova's core must remain lightweight. We strictly use standard Python 3.8+. Do not introduce external libraries without a critical, high-level justification.
+- **Zero Dependencies**: Nova's core must remain lightweight. We strictly use standard Python 3.8+. Do not introduce external libraries without a critical justification.
 - **Extreme Speed**: If a validation cycle exceeds 50ms, the code is not production-ready. Performance is a feature.
 - **Cryptographic Integrity**: The Ledger is the heart of Nova. Any changes to signature or hashing logic must be discussed with maximum priority.
-- **v3.0.0 Compatibility**: Update CLI help strings, error payloads, and documentation when behavior changes.
+- **Version Compatibility**: Update CLI help strings, error payloads, and documentation when behavior changes.
 
 ## 🛠️ How to Get Started
 
 1. **Fork the repository** and clone it to your local environment.
 2. **Create a feature branch**: `git checkout -b feature/amazing-improvement`.
 3. **Develop with Quality**: Write clean, self-documented code and utilize Python type hinting.
-4. **Technical Verification**: Run `python nova.py status` to ensure all core functions remain intact.
+4. **Technical Verification**: Run `python nova.py status` (backend required) to ensure core paths remain intact.
 5. **Pull Request**: Submit your changes with a clear description of the impact and technical reasoning.
 
 ## 📝 Code Standards
 - **Full Compatibility**: Code must run flawlessly across Windows (PowerShell), macOS, and Linux.
-- **User Experience (UX)**: If modifying the CLI, respect the "Ghost Writing" animations and arrow-key navigation system.
-- **Documentation**: If you add a feature, update the internal manuals, help strings, and any v3.0.0 references.
+- **User Experience (UX)**: If modifying the CLI, respect the existing visual language and arrow-key navigation system.
+- **Documentation**: If you add a feature, update internal manuals, help strings, and any version references.
 
 ## 🐛 Bug Reporting
 If you encounter a flaw, please open an **Issue** including:

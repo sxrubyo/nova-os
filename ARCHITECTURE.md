@@ -1,16 +1,16 @@
 # 🏛️ Nova OS Architecture
 **Maintained by @sxrubyo**
 
-Nova OS v3.0.0 is a high-performance, zero-latency governance layer for autonomous systems. The architecture follows a Security-by-Design principle: no action is executed without cryptographic verification, and every decision is traceable.
+Nova OS is a high-performance, low-latency governance layer for autonomous systems. The architecture follows a Security-by-Design principle: no action is executed without cryptographic verification, and every decision is traceable end-to-end.
 
 ## 🏗️ System Overview
 The system is composed of three primary layers:
 
-1. **The Core CLI (nova.py)**: A zero-dependency Python engine that acts as the primary interface. It handles local state, animations, and the arrow-key navigation system.
+1. **The Core CLI (nova.py)**: A zero-dependency Python engine that acts as the primary interface. It manages local state, UX primitives, and interactive navigation.
 2. **The Validation API**: A FastAPI backend that processes intents, calculates scores (heuristic or LLM), enforces duplicate detection, and triggers alerts.
 3. **The Intent Ledger**: A PostgreSQL-backed immutable log where every action is hashed and chained to ensure auditability.
 
-Supporting services in v3.0.0:
+Supporting services:
 - **Memory Engine**: relevance-based context retrieval and auto-save.
 - **Duplicate Guard**: similarity-based suppression with time windows.
 - **Alert System**: escalations and violations routed into alerts.
@@ -29,7 +29,7 @@ Every intent follows this lifecycle:
 ## 🛠️ Tech Stack
 - **Language**: Python 3.8+ (Zero external dependencies for the CLI).
 - **Backend**: FastAPI / Uvicorn.
-- **Database**: PostgreSQL (Relational integrity for the Ledger).
+- **Database**: PostgreSQL (relational integrity for the Ledger).
 - **Environment**: Docker & Docker Compose for enterprise-grade deployment.
 
 ---

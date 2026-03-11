@@ -27,6 +27,7 @@ import re
 import shutil
 import platform
 import subprocess
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -256,8 +257,8 @@ _AGENT_WAKE_MESSAGES = [
     "Systems coming online...",
 ]
 
-NOVA_VERSION = "3.0.0"
-NOVA_BUILD = "2024.01.enterprise"
+NOVA_VERSION = "3.1.0"
+NOVA_BUILD = "2026.03.enterprise"
 NOVA_CODENAME = "Constellation"
 
 # Command aliases for power users
@@ -588,6 +589,59 @@ def hint(msg, prefix="  "):
 def dim(msg, prefix="       "):
     """Dimmed secondary text."""
     print(f"{prefix}" + q(C.G2, msg))
+
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+def strip_ansi(text):
+    """Strip ANSI escape codes for accurate width calculations."""
+    return ANSI_RE.sub("", text or "")
+
+
+def _pad_ansi(text, width):
+    raw = strip_ansi(text)
+    pad = max(0, width - len(raw))
+    return f"{text}{' ' * pad}"
+
+
+def render_table(title, headers, rows, prefix="  "):
+    """Render a rich table with box-drawing borders."""
+    if title:
+        print(prefix + q(C.G2, title))
+        print()
+    
+    widths = [len(strip_ansi(h)) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(strip_ansi(str(cell))))
+    
+    top = "┌" + "┬".join("─" * (w + 2) for w in widths) + "┐"
+    mid = "├" + "┼".join("─" * (w + 2) for w in widths) + "┤"
+    bot = "└" + "┴".join("─" * (w + 2) for w in widths) + "┘"
+    
+    def _line(cells):
+        parts = []
+        for i, cell in enumerate(cells):
+            parts.append(" " + _pad_ansi(str(cell), widths[i]) + " ")
+        return "│" + "│".join(parts) + "│"
+    
+    print(prefix + q(C.G3, top))
+    print(prefix + q(C.W, _line(headers)))
+    print(prefix + q(C.G3, mid))
+    for row in rows:
+        print(prefix + _line(row))
+    print(prefix + q(C.G3, bot))
+    print()
+
+
+def health_meter(score, width=28):
+    """Visual health meter for status screens."""
+    score = max(0, min(100, int(score)))
+    filled = int((score / 100) * width)
+    empty = width - filled
+    color = C.GRN if score >= 80 else C.YLW if score >= 55 else C.RED
+    bar = q(color, "█" * filled) + q(C.G3, "░" * empty)
+    return f"{bar}  {q(color, f'{score:3d}%')}"
 
 def nl(count=1):
     """Print newlines."""
@@ -1923,6 +1977,32 @@ def format_api_error(result, fallback="Unknown error"):
     return message
 
 
+def _parse_host_port(value, default_host="127.0.0.1", default_port=7755):
+    """Parse host:port strings with fallbacks."""
+    if not value:
+        return default_host, default_port
+    if ":" in value:
+        host, port = value.rsplit(":", 1)
+        try:
+            return host or default_host, int(port)
+        except ValueError:
+            return default_host, default_port
+    return value, default_port
+
+
+def _http_post_json(url, payload, headers=None, timeout=20):
+    """POST JSON and return status, headers, body."""
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Content-Type", "application/json")
+    if headers:
+        for k, v in headers.items():
+            req.add_header(k, v)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read().decode()
+        return resp.status, dict(resp.headers), raw
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # VERSION CHECK — Auto-update notifications
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2149,176 +2229,177 @@ def get_strings(lang="en"):
 # RULE TEMPLATES — Pre-built agent configurations
 # ══════════════════════════════════════════════════════════════════════════════
 
-RULE_TEMPLATES = {
-    "email-safety": {
-        "label": "Email Safety",
-        "description": "Block external sends, protect inbox integrity",
-        "icon": "✉",
-        "can_do": [
-            "send email to verified contacts",
-            "read inbox",
-            "draft emails",
-            "reply to existing threads",
-            "search emails",
-        ],
-        "cannot_do": [
-            "send email to external domains",
-            "delete emails permanently",
-            "forward to personal accounts",
-            "modify email rules or filters",
-            "access archived emails",
-        ],
-    },
-    "database-readonly": {
-        "label": "Database Read-Only",
-        "description": "SELECT only — no mutations allowed",
-        "icon": "⊞",
-        "can_do": [
-            "SELECT queries",
-            "read schemas",
-            "list tables",
-            "explain query plans",
-            "read indexes",
-        ],
-        "cannot_do": [
-            "INSERT statements",
-            "UPDATE statements",
-            "DELETE statements",
-            "DROP operations",
-            "ALTER operations",
-            "TRUNCATE tables",
-            "CREATE objects",
-            "GRANT permissions",
-        ],
-    },
-    "social-media": {
-        "label": "Social Media Manager",
-        "description": "Draft and schedule, never auto-publish",
-        "icon": "◎",
-        "can_do": [
-            "read posts and analytics",
-            "draft content",
-            "schedule posts for review",
-            "reply to comments",
-            "read messages",
-        ],
-        "cannot_do": [
-            "publish without approval",
-            "delete posts",
-            "change account settings",
-            "DM users directly",
-            "modify profile",
-            "connect new accounts",
-        ],
-    },
-    "payment-guard": {
-        "label": "Payment Guard",
-        "description": "Verify and read — never initiate charges",
-        "icon": "◈",
-        "can_do": [
-            "read transaction history",
-            "verify payment status",
-            "list subscriptions",
-            "check balance",
-            "view invoices",
-        ],
-        "cannot_do": [
-            "create charges",
-            "issue refunds over $100",
-            "modify subscriptions",
-            "update payment methods",
-            "transfer funds",
-            "change billing info",
-        ],
-    },
-    "devops-safe": {
-        "label": "DevOps Safe Mode",
-        "description": "Monitor and report, no destructive operations",
-        "icon": "◉",
-        "can_do": [
-            "read logs",
-            "check service status",
-            "list deployments",
-            "run health checks",
-            "view metrics and alerts",
-            "read configurations",
-        ],
-        "cannot_do": [
-            "deploy to production",
-            "scale down services",
-            "delete resources",
-            "modify secrets",
-            "change DNS records",
-            "rollback without approval",
-            "terminate instances",
-        ],
-    },
-    "crm-assistant": {
-        "label": "CRM Assistant",
-        "description": "Read and update contacts, no deletions",
-        "icon": "◻",
-        "can_do": [
-            "read contacts",
-            "update notes on contacts",
-            "search leads",
-            "log activities",
-            "view deal history",
-        ],
-        "cannot_do": [
-            "delete contacts",
-            "export all data",
-            "modify deal amounts",
-            "send mass emails",
-            "change pipeline stages",
-            "merge contacts",
-        ],
-    },
-    "file-readonly": {
-        "label": "File System Read-Only",
-        "description": "Read files, no write or delete",
-        "icon": "◯",
-        "can_do": [
-            "read files",
-            "list directories",
-            "search file contents",
-            "view file metadata",
-        ],
-        "cannot_do": [
-            "write files",
-            "delete files",
-            "rename files",
-            "create directories",
-            "modify permissions",
-            "move files",
-        ],
-    },
-    "api-conservative": {
-        "label": "API Conservative",
-        "description": "GET only, no modifications",
-        "icon": "⊘",
-        "can_do": [
-            "GET requests",
-            "read documentation",
-            "check API status",
-        ],
-        "cannot_do": [
-            "POST requests",
-            "PUT requests",
-            "DELETE requests",
-            "PATCH requests",
-            "create webhooks",
-            "modify API keys",
-        ],
-    },
-}
+def _build_rule_templates():
+    return {
+        "email-safety": {
+            "label": "Email Safety",
+            "description": "Block external sends, protect inbox integrity",
+            "icon": "✉",
+            "can_do": [
+                "send email to verified contacts",
+                "read inbox",
+                "draft emails",
+                "reply to existing threads",
+                "search emails",
+            ],
+            "cannot_do": [
+                "send email to external domains",
+                "delete emails permanently",
+                "forward to personal accounts",
+                "modify email rules or filters",
+                "access archived emails",
+            ],
+        },
+        "database-readonly": {
+            "label": "Database Read-Only",
+            "description": "SELECT only — no mutations allowed",
+            "icon": "⊞",
+            "can_do": [
+                "SELECT queries",
+                "read schemas",
+                "list tables",
+                "explain query plans",
+                "read indexes",
+            ],
+            "cannot_do": [
+                "INSERT statements",
+                "UPDATE statements",
+                "DELETE statements",
+                "DROP operations",
+                "ALTER operations",
+                "TRUNCATE tables",
+                "CREATE objects",
+                "GRANT permissions",
+            ],
+        },
+        "social-media": {
+            "label": "Social Media Manager",
+            "description": "Draft and schedule, never auto-publish",
+            "icon": "◎",
+            "can_do": [
+                "read posts and analytics",
+                "draft content",
+                "schedule posts for review",
+                "reply to comments",
+                "read messages",
+            ],
+            "cannot_do": [
+                "publish without approval",
+                "delete posts",
+                "change account settings",
+                "DM users directly",
+                "modify profile",
+                "connect new accounts",
+            ],
+        },
+        "payment-guard": {
+            "label": "Payment Guard",
+            "description": "Verify and read — never initiate charges",
+            "icon": "◈",
+            "can_do": [
+                "read transaction history",
+                "verify payment status",
+                "list subscriptions",
+                "check balance",
+                "view invoices",
+            ],
+            "cannot_do": [
+                "create charges",
+                "issue refunds over $100",
+                "modify subscriptions",
+                "update payment methods",
+                "transfer funds",
+                "change billing info",
+            ],
+        },
+        "devops-safe": {
+            "label": "DevOps Safe Mode",
+            "description": "Monitor and report, no destructive operations",
+            "icon": "◉",
+            "can_do": [
+                "read logs",
+                "check service status",
+                "list deployments",
+                "run health checks",
+                "view metrics and alerts",
+                "read configurations",
+            ],
+            "cannot_do": [
+                "deploy to production",
+                "scale down services",
+                "delete resources",
+                "modify secrets",
+                "change DNS records",
+                "rollback without approval",
+                "terminate instances",
+            ],
+        },
+        "crm-assistant": {
+            "label": "CRM Assistant",
+            "description": "Read and update contacts, no deletions",
+            "icon": "◻",
+            "can_do": [
+                "read contacts",
+                "update notes on contacts",
+                "search leads",
+                "log activities",
+                "view deal history",
+            ],
+            "cannot_do": [
+                "delete contacts",
+                "export all data",
+                "modify deal amounts",
+                "send mass emails",
+                "change pipeline stages",
+                "merge contacts",
+            ],
+        },
+        "file-readonly": {
+            "label": "File System Read-Only",
+            "description": "Read files, no write or delete",
+            "icon": "◯",
+            "can_do": [
+                "read files",
+                "list directories",
+                "search file contents",
+                "view file metadata",
+            ],
+            "cannot_do": [
+                "write files",
+                "delete files",
+                "rename files",
+                "create directories",
+                "modify permissions",
+                "move files",
+            ],
+        },
+        "api-conservative": {
+            "label": "API Conservative",
+            "description": "GET only, no modifications",
+            "icon": "⊘",
+            "can_do": [
+                "GET requests",
+                "read documentation",
+                "check API status",
+            ],
+            "cannot_do": [
+                "POST requests",
+                "PUT requests",
+                "DELETE requests",
+                "PATCH requests",
+                "create webhooks",
+                "modify API keys",
+            ],
+        },
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SKILLS CATALOG — Integration definitions
 # ══════════════════════════════════════════════════════════════════════════════
 
-class LazySkills:
-    """Lazy-loading wrapper to avoid upfront cost on fast commands like `status`."""
+class LazyCatalog:
+    """Lazy-loading wrapper to avoid upfront cost on fast commands."""
     def __init__(self, builder):
         self._builder = builder
         self._data = None
@@ -2351,6 +2432,11 @@ class LazySkills:
     
     def __contains__(self, key):
         return key in self._load()
+
+
+class LazySkills(LazyCatalog):
+    """Lazy-loading wrapper for skills catalog."""
+    pass
 
 
 def _build_skills():
@@ -2738,6 +2824,7 @@ def _build_skills():
 }
 
 
+RULE_TEMPLATES = LazyCatalog(_build_rule_templates)
 SKILLS = LazySkills(_build_skills)
 
 SKILL_CATEGORIES = [
@@ -3215,13 +3302,12 @@ def cmd_init(args):
 
 def cmd_status(args):
     """System status dashboard."""
-    print_logo()
+    print_logo(compact=True)
     
     api, cfg = get_api()
     
-    with Spinner("Loading dashboard...") as sp:
-        stats = api.get("/stats")
-        health = api.get("/health")
+    stats = api.get("/stats")
+    health = api.get("/health")
     
     # Connection status
     if "error" in health:
@@ -3239,18 +3325,37 @@ def cmd_status(args):
         return
     
     # Server info
-    section("Server")
-    kv("URL", cfg["api_url"], C.B7)
-    kv("Status", "Operational", C.GRN)
+    status_label = q(C.GRN, "Operational")
+    if health.get("status") == "degraded":
+        status_label = q(C.YLW, "Degraded")
+    if health.get("status") == "down":
+        status_label = q(C.RED, "Down")
+    
+    server_rows = [
+        ["URL", q(C.B7, cfg["api_url"])],
+        ["Status", status_label],
+    ]
     if health.get("version"):
-        kv("Version", health["version"], C.G2)
+        server_rows.append(["Version", q(C.G2, health["version"])])
+    if health.get("build"):
+        server_rows.append(["Build", q(C.G2, health["build"])])
+    if health.get("environment"):
+        server_rows.append(["Environment", q(C.G2, str(health["environment"]))])
+    if health.get("database"):
+        db_color = C.GRN if health["database"] == "connected" else C.RED
+        server_rows.append(["Database", q(db_color, health["database"])])
+    if health.get("llm_available") is not None:
+        llm_color = C.GRN if health["llm_available"] else C.G2
+        server_rows.append(["LLM", q(llm_color, "available" if health["llm_available"] else "disabled")])
     if api.last_latency:
-        kv("Latency", f"{api.last_latency}ms", C.G2)
+        server_rows.append(["Latency", q(C.G2, f"{api.last_latency}ms")])
+    if health.get("uptime_seconds") is not None:
+        server_rows.append(["Uptime", q(C.G2, f"{int(health['uptime_seconds'])}s")])
+    
+    render_table("Server", ["Field", "Value"], server_rows)
     
     # Activity metrics
     if "error" not in stats:
-        section("Activity")
-        
         total = stats.get("total_actions", 0)
         approved = stats.get("approved", 0)
         blocked = stats.get("blocked", 0)
@@ -3258,35 +3363,51 @@ def cmd_status(args):
         duplicates = stats.get("duplicates_blocked", 0)
         rate = stats.get("approval_rate", 0)
         
-        kv("Total actions", f"{total:,}")
-        kv("Approved", f"{approved:,}", C.GRN)
-        kv("Blocked", f"{blocked:,}", C.RED if blocked > 0 else C.G2)
-        kv("Escalated", f"{escalated:,}", C.YLW if escalated > 0 else C.G2)
-        kv("Duplicates blocked", f"{duplicates:,}", C.ORG if duplicates > 0 else C.G2)
-        kv("Approval rate", f"{rate}%")
+        activity_rows = [
+            ["Total actions", f"{total:,}"],
+            ["Approved", q(C.GRN, f"{approved:,}")],
+            ["Blocked", q(C.RED if blocked > 0 else C.G2, f"{blocked:,}")],
+            ["Escalated", q(C.YLW if escalated > 0 else C.G2, f"{escalated:,}")],
+            ["Duplicates blocked", q(C.ORG if duplicates > 0 else C.G2, f"{duplicates:,}")],
+            ["Approval rate", f"{rate}%"],
+        ]
         
-        if total > 0:
-            print()
-            print("  " + q(C.G2, "Distribution") + "   " + score_bar(rate, 24))
+        render_table("Activity", ["Metric", "Value"], activity_rows)
         
         # Resources
-        section("Resources")
-        
         agents = stats.get("active_agents", 0)
         memories = stats.get("memories_stored", 0)
         avg_score = stats.get("avg_score", 0)
         alerts = stats.get("alerts_pending", 0)
         
-        kv("Active agents", str(agents), C.B7)
-        kv("Memories stored", f"{memories:,}", C.B6)
-        kv("Avg score", str(avg_score))
-        kv("Pending alerts", str(alerts), C.YLW if alerts > 0 else C.G2)
+        resource_rows = [
+            ["Active agents", q(C.B7, str(agents))],
+            ["Memories stored", q(C.B6, f"{memories:,}")],
+            ["Avg score", str(avg_score)],
+            ["Pending alerts", q(C.YLW if alerts > 0 else C.G2, str(alerts))],
+        ]
         
-        # Score trend sparkline
+        render_table("Resources", ["Metric", "Value"], resource_rows)
+        
         trend = stats.get("score_trend")
         if trend and isinstance(trend, list) and len(trend) > 1:
+            print("  " + q(C.G2, "Score trend (7d)") + "  " + sparkline(trend))
             print()
-            kv("Score trend (7d)", sparkline(trend))
+        
+        # Health meter
+        health_score = rate if isinstance(rate, int) else 0
+        if health.get("status") == "degraded":
+            health_score -= 15
+        if health.get("database") != "connected":
+            health_score -= 30
+        if health.get("llm_available") is False:
+            health_score -= 5
+        if alerts:
+            health_score -= min(20, alerts * 3)
+        health_score = max(0, min(100, health_score))
+        
+        print("  " + q(C.G2, "Health Meter") + "  " + health_meter(health_score))
+        print()
     
     # Queue status
     queue = get_queue()
@@ -3305,6 +3426,367 @@ def cmd_status(args):
             dim("Run: pip install --upgrade nova-cli")
     
     print()
+
+
+def cmd_shield(args):
+    """Proxy mode for external agent calls with Nova validation."""
+    api, cfg = get_api()
+    token_default = args.token or cfg.get("default_token", "")
+    upstream = (args.upstream or "").strip()
+    host, port = _parse_host_port(args.listen, default_port=7755)
+    dry_run = getattr(args, "dry_run", False)
+    
+    class ShieldHandler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            if DEBUG:
+                super().log_message(format, *args)
+        
+        def _send(self, status, payload):
+            body = json.dumps(payload).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            if "verdict" in payload:
+                self.send_header("X-Nova-Verdict", str(payload["verdict"]))
+            self.end_headers()
+            self.wfile.write(body)
+        
+        def do_GET(self):
+            if self.path in ("/", "/health"):
+                self._send(200, {
+                    "status": "ok",
+                    "service": "nova-shield",
+                    "version": NOVA_VERSION,
+                })
+                return
+            self._send(404, {"error": "Not found"})
+        
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            raw = self.rfile.read(length).decode() if length else ""
+            try:
+                payload = json.loads(raw) if raw else {}
+            except Exception:
+                self._send(400, {"error": "Invalid JSON payload"})
+                return
+            
+            action = payload.get("action", "")
+            context = payload.get("context", "")
+            token_id = payload.get("token_id") or token_default
+            if not action:
+                self._send(400, {"error": "Missing action"})
+                return
+            if not token_id:
+                self._send(400, {"error": "Missing token_id"})
+                return
+            
+            validation_payload = {
+                "token_id": token_id,
+                "action": action,
+                "context": context,
+                "generate_response": bool(payload.get("generate_response", False)),
+                "check_duplicates": payload.get("check_duplicates", True),
+            }
+            if payload.get("dry_run") or dry_run:
+                validation_payload["dry_run"] = True
+            
+            result = api.post("/validate", validation_payload)
+            if "error" in result:
+                self._send(502, {"error": format_api_error(result)})
+                return
+            
+            verdict = result.get("verdict", "?")
+            response_payload = {
+                "verdict": verdict,
+                "score": result.get("score", 0),
+                "reason": result.get("reason", ""),
+                "agent_name": result.get("agent_name", ""),
+                "ledger_id": result.get("ledger_id"),
+            }
+            
+            if verdict != "APPROVED":
+                self._send(403, response_payload)
+                return
+            
+            if upstream:
+                try:
+                    status, headers, upstream_raw = _http_post_json(
+                        upstream,
+                        payload,
+                        headers={
+                            "X-Nova-Verdict": verdict,
+                            "X-Nova-Score": str(result.get("score", 0)),
+                            "X-Nova-Agent": str(result.get("agent_name", "")),
+                        },
+                    )
+                    try:
+                        upstream_body = json.loads(upstream_raw)
+                    except Exception:
+                        upstream_body = upstream_raw
+                    response_payload["upstream_status"] = status
+                    response_payload["upstream"] = upstream_body
+                    response_payload["executed"] = True
+                except Exception as e:
+                    response_payload["upstream_error"] = str(e)
+                    self._send(502, response_payload)
+                    return
+            
+            self._send(200, response_payload)
+    
+    server = ThreadingHTTPServer((host, port), ShieldHandler)
+    
+    print_logo(compact=True)
+    print()
+    ok(f"Shield proxy listening on {host}:{port}")
+    if upstream:
+        dim(f"Upstream: {upstream}")
+    dim("POST JSON with {action, context, token_id} to validate and forward")
+    print()
+    
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print()
+        warn("Shield stopped.")
+        print()
+
+
+def _iter_skill_files(base_path):
+    for path in base_path.rglob("*"):
+        if path.is_dir():
+            continue
+        if path.suffix.lower() in (".json", ".txt", ".py", ".sh", ".yml", ".yaml",
+                                   ".toml", ".ini", ".cfg", ".env", ".ps1", ".md"):
+            yield path
+
+
+def cmd_scout(args):
+    """Security scanner for skills folder."""
+    ensure_dirs()
+    target = Path(args.path) if args.path else SKILLS_DIR
+    
+    if not target.exists():
+        fail(f"Skills folder not found: {target}")
+        return
+    
+    rules = [
+        ("Network egress", re.compile(r"(https?://|ftp://|sftp://)", re.I), "HIGH"),
+        ("Webhook exfil", re.compile(r"(webhook|hookbin|requestbin|pastebin|transfer\\.sh|ngrok)", re.I), "HIGH"),
+        ("Command exec", re.compile(r"(subprocess|os\\.system|shell=True|Popen\\(|exec\\(|eval\\()", re.I), "HIGH"),
+        ("Credential patterns", re.compile(r"(api[_-]?key|secret|token|passwd|password)", re.I), "MED"),
+        ("Encoding/pack", re.compile(r"(base64|b64encode|gzip|zlib)", re.I), "MED"),
+        ("File sweep", re.compile(r"(os\\.walk|glob\\(|/etc/passwd|/var/lib|/home/)", re.I), "MED"),
+    ]
+    
+    findings = []
+    scanned = 0
+    for path in _iter_skill_files(target):
+        try:
+            if path.stat().st_size > 1024 * 1024:
+                continue
+            text = path.read_text(errors="ignore")
+        except Exception:
+            continue
+        
+        scanned += 1
+        for label, pattern, severity in rules:
+            for match in pattern.finditer(text):
+                line = text[:match.start()].count("\n") + 1
+                snippet = match.group(0)[:80]
+                findings.append([
+                    q(C.RED if severity == "HIGH" else C.YLW, severity),
+                    label,
+                    f"{path.relative_to(target)}:{line}",
+                    snippet,
+                ])
+    
+    print_logo(compact=True)
+    print()
+    kv("Scanned files", str(scanned), C.G2)
+    kv("Findings", str(len(findings)), C.YLW if findings else C.GRN)
+    print()
+    
+    if findings:
+        render_table("Potential Exfil Signals", ["Risk", "Rule", "Location", "Match"], findings)
+        warn("Review findings. False positives are possible.")
+    else:
+        ok("No exfiltration signatures detected.")
+    print()
+
+
+def _repair_json_file(path, default, label, fixes):
+    if path.exists():
+        try:
+            data = json.loads(path.read_text())
+            return data
+        except Exception:
+            backup = path.with_suffix(path.suffix + f".corrupt-{int(time.time())}")
+            try:
+                path.replace(backup)
+                fixes.append(f"{label}: repaired (backup {backup.name})")
+            except Exception:
+                fixes.append(f"{label}: repaired (backup failed)")
+    else:
+        fixes.append(f"{label}: created")
+    
+    _write_json(path, default)
+    return default
+
+
+def cmd_doctor(args):
+    """Self-repair configuration and permissions."""
+    ensure_dirs()
+    fixes = []
+    
+    cfg = _repair_json_file(CONFIG_FILE, DEFAULT_CONFIG, "config", fixes)
+    keys = _repair_json_file(KEYS_FILE, {"keys": [], "active": None}, "keys", fixes)
+    profiles = _repair_json_file(PROFILES_FILE, {
+        "profiles": {
+            "default": {
+                "name": "Default",
+                "api_url": "http://localhost:8000",
+                "description": "Local development server",
+            }
+        },
+        "active": "default"
+    }, "profiles", fixes)
+    _repair_json_file(HISTORY_FILE, [], "history", fixes)
+    _repair_json_file(QUEUE_FILE, [], "offline_queue", fixes)
+    
+    # Normalize config fields
+    updated = False
+    for k, v in DEFAULT_CONFIG.items():
+        if k not in cfg:
+            cfg[k] = v
+            updated = True
+    if cfg.get("api_url") and not cfg["api_url"].startswith(("http://", "https://")):
+        cfg["api_url"] = "http://" + cfg["api_url"]
+        updated = True
+    if updated:
+        cfg["last_updated"] = datetime.now().isoformat()
+        _write_json(CONFIG_FILE, cfg)
+        fixes.append("config: normalized fields")
+    
+    # Permissions hardening
+    if args.fix_perms:
+        for d in [NOVA_DIR, SESSIONS_DIR, SKILLS_DIR, LOGS_DIR]:
+            try:
+                os.chmod(d, 0o700)
+            except Exception:
+                pass
+        for f in [CONFIG_FILE, KEYS_FILE, PROFILES_FILE, HISTORY_FILE, QUEUE_FILE]:
+            _harden_file_permissions(f, 0o600)
+        fixes.append("permissions: hardened")
+    
+    print_logo(compact=True)
+    print()
+    if fixes:
+        for item in fixes:
+            ok(item)
+    else:
+        ok("No repairs needed.")
+    print()
+
+
+def _skill_to_mcp(skill_id, skill):
+    properties = {}
+    required = []
+    for field in skill.get("fields", []):
+        properties[field["key"]] = {
+            "type": "string",
+            "description": field.get("description", ""),
+            "secret": bool(field.get("secret", False)),
+        }
+        if field.get("required"):
+            required.append(field["key"])
+    
+    return {
+        "id": skill.get("mcp") or skill_id,
+        "name": skill.get("name", skill_id),
+        "description": skill.get("description", ""),
+        "category": skill.get("category", ""),
+        "capabilities": {
+            "what_it_does": skill.get("what_it_does", ""),
+        },
+        "config_schema": {
+            "type": "object",
+            "properties": properties,
+            "required": required,
+        },
+        "metadata": {
+            "icon": skill.get("icon"),
+            "docs_url": skill.get("docs_url"),
+        },
+    }
+
+
+def _load_mcp_overrides():
+    extras = []
+    if not SKILLS_DIR.exists():
+        return extras
+    for path in SKILLS_DIR.rglob("*.mcp.json"):
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            continue
+        if isinstance(data, dict) and "servers" in data:
+            extras.extend(data["servers"])
+        elif isinstance(data, dict):
+            extras.append(data)
+    return extras
+
+
+def cmd_mcp(args):
+    """Expose skills in MCP format."""
+    sub = args.subcommand or "export"
+    
+    if sub in ("list", "ls"):
+        installed = set(get_installed_skills())
+        rows = []
+        for key, skill in SKILLS.items():
+            rows.append([
+                skill.get("name", key),
+                skill.get("mcp") or key,
+                "installed" if key in installed else "",
+            ])
+        render_table("MCP Skills", ["Skill", "MCP ID", "Status"], rows)
+        return
+    
+    if sub in ("export", "print", "json", ""):
+        servers = []
+        for key, skill in SKILLS.items():
+            servers.append(_skill_to_mcp(key, skill))
+        servers.extend(_load_mcp_overrides())
+        
+        payload = {
+            "mcp_version": "1.0",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "servers": servers,
+        }
+        
+        if args.output:
+            Path(args.output).write_text(json.dumps(payload, indent=2))
+            ok(f"MCP export written to {args.output}")
+            return
+        
+        print(json.dumps(payload, indent=2))
+        return
+    
+    if sub in ("import", "read"):
+        if not args.file:
+            fail("Provide --file to import MCP JSON.")
+            return
+        try:
+            data = json.loads(Path(args.file).read_text())
+        except Exception as e:
+            fail(f"Invalid MCP file: {e}")
+            return
+        servers = data.get("servers", []) if isinstance(data, dict) else []
+        rows = [[s.get("name", ""), s.get("id", ""), s.get("description", "")] for s in servers]
+        render_table("MCP Import Preview", ["Name", "ID", "Description"], rows)
+        return
+    
+    fail(f"Unknown subcommand: {sub}")
+    hint("Use: nova mcp export | list | import")
 
 
 def cmd_whoami(args):
@@ -3736,7 +4218,7 @@ def cmd_ledger(args):
         agent = entry.get("agent_name", "")[:20]
         ts = time_ago(entry.get("executed_at", ""))
         
-                vc = verdict_colors.get(verdict, C.G2)
+        vc = verdict_colors.get(verdict, C.G2)
         
         print()
         print("  " + q(vc, "■") + "  " + q(C.W, action))
@@ -5043,6 +5525,10 @@ def cmd_help(args=None):
             ("sync", "Process offline queue"),
             ("seed", "Load demo data"),
             ("alerts", "View pending alerts"),
+            ("shield", "Proxy validation for external agents"),
+            ("scout", "Scan skills for exfil signals"),
+            ("doctor", "Auto-repair config & permissions"),
+            ("mcp", "Export skills in MCP format"),
         ]),
     ]
     
@@ -5112,7 +5598,9 @@ def cmd_completion(args):
         "init", "status", "config", "whoami",
         "agent", "validate", "test",
         "memory", "ledger", "verify", "watch", "export", "audit",
-        "keys", "skill", "sync", "seed", "alerts", "help", "completion"
+        "keys", "skill", "sync", "seed", "alerts",
+        "shield", "scout", "doctor", "mcp",
+        "help", "completion"
     ]
     
     if shell == "bash":
@@ -5136,6 +5624,9 @@ _nova_completions() {{
             ;;
         keys)
             COMPREPLY=($(compgen -W "create delete use list" -- "$cur"))
+            ;;
+        mcp)
+            COMPREPLY=($(compgen -W "export list import" -- "$cur"))
             ;;
         completion)
             COMPREPLY=($(compgen -W "bash zsh fish" -- "$cur"))
@@ -5173,6 +5664,10 @@ _nova() {{
         'sync:Process queue'
         'seed:Load demo data'
         'alerts:View alerts'
+        'shield:Proxy validation'
+        'scout:Skills security scan'
+        'doctor:Auto-repair'
+        'mcp:MCP export'
         'help:Show help'
     )
     
@@ -5204,12 +5699,17 @@ complete -c nova -n __fish_use_subcommand -a skill -d 'Skill catalog'
 complete -c nova -n __fish_use_subcommand -a sync -d 'Process queue'
 complete -c nova -n __fish_use_subcommand -a seed -d 'Demo data'
 complete -c nova -n __fish_use_subcommand -a alerts -d 'View alerts'
+complete -c nova -n __fish_use_subcommand -a shield -d 'Proxy validation'
+complete -c nova -n __fish_use_subcommand -a scout -d 'Skills security scan'
+complete -c nova -n __fish_use_subcommand -a doctor -d 'Auto-repair'
+complete -c nova -n __fish_use_subcommand -a mcp -d 'MCP export'
 complete -c nova -n __fish_use_subcommand -a help -d 'Show help'
 
 complete -c nova -n '__fish_seen_subcommand_from agent' -a 'create list'
 complete -c nova -n '__fish_seen_subcommand_from memory' -a 'save list'
 complete -c nova -n '__fish_seen_subcommand_from skill' -a 'add remove info list'
 complete -c nova -n '__fish_seen_subcommand_from keys' -a 'create delete use list'
+complete -c nova -n '__fish_seen_subcommand_from mcp' -a 'export list import'
 """.strip())
     
     else:
@@ -5246,6 +5746,10 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--reconfigure", action="store_true")
     parser.add_argument("--interval", type=int, default=3)
+    parser.add_argument("--listen", default="")
+    parser.add_argument("--upstream", default="")
+    parser.add_argument("--path", default="")
+    parser.add_argument("--fix-perms", action="store_true")
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument("--help", "-h", action="store_true")
     parser.add_argument("--version", "-V", action="store_true")
@@ -5267,7 +5771,7 @@ def main():
         return
     
     # First-run detection
-    if args.command not in ("init", "help", "completion", "--help", "-h") and \
+    if args.command not in ("init", "help", "completion", "doctor", "scout", "mcp", "--help", "-h") and \
        not CONFIG_FILE.exists():
         print()
         print("  " + q(C.GLD, "✦", bold=True) + "  " + q(C.W, "nova", bold=True))
@@ -5312,6 +5816,13 @@ def main():
         
         # Sync
         ("sync", ""): cmd_sync,
+        ("shield", ""): cmd_shield,
+        ("scout", ""): cmd_scout,
+        ("doctor", ""): cmd_doctor,
+        ("mcp", ""): cmd_mcp,
+        ("mcp", "export"): cmd_mcp,
+        ("mcp", "list"): cmd_mcp,
+        ("mcp", "import"): cmd_mcp,
         
         # Seed
         ("seed", ""): cmd_seed,

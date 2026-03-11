@@ -840,7 +840,7 @@
 <script>
 // ── Config ───────────────────────────────────────────────────────
 const API = '/api';
-const API_KEY = 'nova_demo_key_12345';
+const API_KEY = localStorage.getItem('nova_api_key') || 'nova_demo_key_12345';
 
 const headers = {
   'Content-Type': 'application/json',

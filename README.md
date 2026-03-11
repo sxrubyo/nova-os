@@ -2,7 +2,7 @@
 **Maintained by @sxrubyo**
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.0.0-black?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.1.0-black?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/python-3.8+-blue?style=for-the-badge" alt="Python">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-green?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/dependencies-zero-red?style=for-the-badge" alt="Zero Dependencies">
@@ -14,9 +14,9 @@
 
 ---
 
-## 🎯 Why Nova OS v3.0.0?
+## 🎯 Why Nova OS?
 
-AI agents are powerful—but without oversight, they're a **liability**. Nova OS is the enterprise-grade governance layer that ensures your agents do exactly what you intend, with **immutable cryptographic proof** of every decision.
+AI agents are powerful—but without oversight, they're a **liability**. Nova OS is an enterprise governance layer that enforces policy, validates intent, and produces **immutable cryptographic proof** of every decision.
 
 ### **Core Capabilities**
 
@@ -70,7 +70,7 @@ python nova.py --help
 ```bash
 nova init
 ```
-Follow the interactive wizard (7 steps, ~2 minutes). You will see:
+Follow the interactive wizard (7 steps, ~2 minutes). You will configure:
 1. How Nova works (validation, ledger, scoring)
 2. Risks & terms (safety guardrails)
 3. Identity (name and org)
@@ -112,12 +112,12 @@ nova status
 ```
 
 ```
-  ✦ Nova OS v3.0.0
+  ✦ Nova OS v3.1.0
   ════════════════════════════════════════════════
 
   Server: https://api.nova-os.com
   Status: Connected
-  Version: 3.0.0-enterprise
+  Version: 3.1.0-enterprise
 
   Activity
   ────────────────────────────────
@@ -225,7 +225,7 @@ nova completion fish > ~/.config/fish/completions/nova.fish
 
 ## 🛠️ Configuration
 
-All configuration stored in `~/.nova/`:
+All configuration is stored in `~/.nova/`:
 
 ```
 ~/.nova/
@@ -246,6 +246,8 @@ export NOVA_VERBOSE=1        # Enable verbose output
 export NO_COLOR=1            # Disable colors
 export NOVA_SERVER=https://api.your-domain.com
 ```
+
+**Security Defaults (Local Only):** The `docker-compose.yml` file ships with development defaults for `POSTGRES_PASSWORD` and `SECRET_KEY`. Override them via environment variables (or a `.env` file) before any production deployment. The frontend dashboard uses a demo API key by default; set `localStorage.setItem('nova_api_key', '...')` in the browser or front the `/api` path with an auth-protecting reverse proxy.
 
 ---
 

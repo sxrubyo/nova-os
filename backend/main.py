@@ -121,8 +121,8 @@ class Settings:
     )
     
     # Server
-    VERSION: str = "3.0.0"
-    BUILD: str = "2024.01.enterprise"
+    VERSION: str = "3.1.0"
+    BUILD: str = "2026.03.enterprise"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     
