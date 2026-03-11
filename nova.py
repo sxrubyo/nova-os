@@ -1086,11 +1086,19 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
             elif vis_idx >= scroll_offset + page_size:
                 scroll_offset = vis_idx - page_size + 1
         
-        # Calculate lines to clear
+        # Calculate lines to clear — must match EXACTLY what we print
         lines_per_opt = 2 if descriptions else 1
-        visible_opts = min(len(filtered), page_size)
-        header_lines = (1 if title else 0) + (1 if allow_filter else 0) + 1
-        total_lines = header_lines + (visible_opts * lines_per_opt) + 2
+        visible_opts  = min(len(filtered), page_size)
+        scroll_up     = 1 if scroll_offset > 0 else 0
+        scroll_down   = 1 if (scroll_offset + page_size < len(filtered)) else 0
+        total_lines   = (
+            (1 if title else 0) +
+            (1 if allow_filter else 0) +
+            1 +                                # spacer after header
+            (visible_opts * lines_per_opt) +
+            scroll_up + scroll_down +
+            1                                  # trailing newline
+        )
         
         out = []
         
