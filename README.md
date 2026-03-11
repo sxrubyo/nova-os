@@ -256,7 +256,7 @@ docker-compose up -d
 - **DigitalOcean**: 1-click deploy available
 
 ### **Managed Cloud**
-Contact us for Nova Cloud: `enterprise@nova-os.com`
+Contact us for Nova Cloud: `sxrubyo@gmail.com`
 
 ---
 
@@ -300,7 +300,7 @@ pytest tests/
 | **Team** | Cloud hosting, 5 agents, email support | $49/mo |
 | **Enterprise** | On-premise, unlimited agents, 24/7 support | Contact us |
 
-**Contact:** `enterprise@nova-os.com` | **Discord:** [discord.gg/nova](https://discord.gg/nova)
+**Contact:** `sxrubyo@gmail.com` | **Discord:** [discord.gg/nova](https://discord.gg/nova)
 
 ---
 
