@@ -176,6 +176,13 @@ def q(color, text, bold=False, dim=False, italic=False, underline=False):
     return styles + color + str(text) + C.R
 
 
+def _render_reset():
+    """Reset ANSI state and set a pure white base for rendering."""
+    sys.stdout.write("\033[0m")
+    if USE_COLOR:
+        sys.stdout.write(_e("38;5;15"))
+
+
 def debug(msg):
     """Print debug message if DEBUG mode is enabled."""
     if DEBUG:
@@ -200,14 +207,6 @@ _NOVA_BLOCK = [
     "  ██║╚██╗██║ ██║   ██║ ╚██╗ ██╔╝ ██╔══██║ ",
     "  ██║ ╚████║ ╚██████╔╝  ╚████╔╝  ██║  ██║ ",
     "  ╚═╝  ╚═══╝  ╚═════╝    ╚═══╝   ╚═╝  ╚═╝ ",
-]
-_NOVA_COLORS = [
-    _e("38;5;15"),
-    _e("38;5;15"),
-    _e("38;5;180"),
-    _e("38;5;180"),
-    _e("38;5;137"),
-    _e("38;5;137"),
 ]
 
 _CLI_BLOCK = [
@@ -521,10 +520,12 @@ def print_logo(tagline=True, compact=False, animated=False, minimal=False):
         animated: Animate the logo reveal
         minimal: Just the ✦ mark
     """
+    _render_reset()
     print()
     
     if minimal:
         print("  " + q(C.GLD_BRIGHT, "✦", bold=True))
+        sys.stdout.write(C.R)
         return
     
     if compact:
@@ -532,12 +533,15 @@ def print_logo(tagline=True, compact=False, animated=False, minimal=False):
         banner = f"✦ nova · v{NOVA_VERSION} · Nova Governance"
         print("  " + q(C.GLD_BRIGHT, banner, bold=True))
         print()
+        sys.stdout.write(C.R)
         return
     
-    # Full logo
+    # Full logo (true gradient)
+    line_colors = [C.W, C.W, C.GLD_BRIGHT, C.GLD_BRIGHT, C.GLD_MATTE, C.GLD_MATTE]
     for i in range(6):
-        nova_part = _NOVA_COLORS[i] + C.BOLD + _NOVA_BLOCK[i] + C.R
-        cli_part = C.GLD_BRIGHT + C.BOLD + _CLI_BLOCK[i] + C.R
+        line_color = line_colors[i]
+        nova_part = line_color + C.BOLD + _NOVA_BLOCK[i] + C.R
+        cli_part = line_color + C.BOLD + _CLI_BLOCK[i] + C.R
         
         # Premium star on designated line
         if i == _STAR_LINE:
@@ -556,15 +560,17 @@ def print_logo(tagline=True, compact=False, animated=False, minimal=False):
         if animated:
             ghost_write(tl, color=C.G2, delay=0.01)
         else:
-            print("  " + q(C.G2, tl))
+            print("  " + q(C.W, tl))
         print("  " + q(C.GLD_BRIGHT, "✦") + " " + q(C.G2, "Nova Constellation · Enterprise Edition"))
         print("  " + q(C.G3, "─" * 62))
     
     print()
+    sys.stdout.write(C.R)
 
 
 def print_mark():
     """Print just the nova mark for sub-screens."""
+    _render_reset()
     print()
     print("  " + q(C.GLD_BRIGHT, "✦", bold=True) + "  " + q(C.W, "nova", bold=True))
     print()
@@ -576,26 +582,32 @@ def print_mark():
 
 def ok(msg, prefix="  "):
     """Success message."""
+    _render_reset()
     print(f"{prefix}" + q(C.GRN, "✓") + "  " + q(C.W, msg))
 
 def fail(msg, prefix="  "):
     """Error message."""
+    _render_reset()
     print(f"{prefix}" + q(C.RED, "✗") + "  " + q(C.W, msg))
 
 def warn(msg, prefix="  "):
     """Warning message."""
+    _render_reset()
     print(f"{prefix}" + q(C.YLW, "!") + "  " + q(C.G1, msg))
 
 def info(msg, prefix="  "):
     """Info message."""
+    _render_reset()
     print(f"{prefix}" + q(C.B6, "·") + "  " + q(C.G1, msg))
 
 def hint(msg, prefix="  "):
     """Hint/tip message."""
+    _render_reset()
     print(f"{prefix}" + q(C.MGN, "→") + "  " + q(C.G2, msg))
 
 def dim(msg, prefix="       "):
     """Dimmed secondary text."""
+    _render_reset()
     print(f"{prefix}" + q(C.G2, msg))
 
 
@@ -614,6 +626,7 @@ def _pad_ansi(text, width):
 
 def render_table(title, headers, rows, prefix="  "):
     """Render a rich table with box-drawing borders."""
+    _render_reset()
     if title:
         print(prefix + q(C.G2, title))
         print()
@@ -1060,6 +1073,7 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
         """Render the selector."""
         nonlocal scroll_offset
         filtered = get_filtered_indices()
+        _render_reset()
         
         # Adjust scroll
         if filtered:
@@ -1082,12 +1096,12 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
         
         # Title
         if title:
-            out.append("  " + q(C.G2, title) + "\n")
+            out.append("  " + q(C.W, title) + "\n")
         
         # Filter input
         if allow_filter:
-            filter_display = filter_text if filter_text else q(C.G3, "type to filter...")
-            out.append("  " + q(C.B6, "/") + " " + filter_display + "\n")
+            filter_display = filter_text if filter_text else q(C.W, "type to filter...")
+            out.append("  " + q(C.W, "/") + " " + filter_display + "\n")
         
         out.append("\n")
         
@@ -1101,25 +1115,24 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
             # Index prefix
             idx_str = ""
             if show_index:
-                idx_str = q(C.G3, f"[{opt_idx + 1}]") + "  "
+                idx_str = q(C.W, f"[{opt_idx + 1}]") + "  "
             
             if is_selected:
-                out.append("  " + q(C.B6, "▸", bold=True) + "  " + idx_str +
+                out.append("  " + q(C.GLD_BRIGHT, ">", bold=True) + "  " + idx_str +
                            q(C.W, opt, bold=True) + "\n")
             else:
-                out.append("     " + idx_str + q(C.G2, opt) + "\n")
+                out.append("     " + idx_str + q(C.W, opt) + "\n")
             
             # Description
             if descriptions and opt_idx < len(descriptions) and descriptions[opt_idx]:
                 desc = descriptions[opt_idx]
-                desc_color = C.G2 if is_selected else C.G3
-                out.append("       " + q(desc_color, desc) + "\n")
+                out.append("       " + q(C.W, desc) + "\n")
         
         # Scroll indicators
         if scroll_offset > 0:
-            out.append("       " + q(C.G3, "↑ more above") + "\n")
+            out.append("       " + q(C.W, "↑ more above") + "\n")
         if scroll_offset + page_size < len(filtered):
-            out.append("       " + q(C.G3, "↓ more below") + "\n")
+            out.append("       " + q(C.W, "↓ more below") + "\n")
         
         out.append("\n")
         
@@ -1136,21 +1149,22 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
 
 def _select_fallback(options, title, default, descriptions, show_index):
     """Fallback selection for non-TTY environments."""
+    _render_reset()
     if title:
-        print("  " + q(C.G2, title))
+        print("  " + q(C.W, title))
     print()
     
     for i, opt in enumerate(options):
-        marker = q(C.B6, "▸", bold=True) if i == default else "  "
+        marker = q(C.GLD_BRIGHT, ">", bold=True) if i == default else "  "
         idx = f"[{i + 1}]  " if show_index else ""
-        label = q(C.W, opt, bold=True) if i == default else q(C.G2, opt)
+        label = q(C.W, opt, bold=True) if i == default else q(C.W, opt)
         print("  " + marker + " " + idx + label)
         
         if descriptions and i < len(descriptions) and descriptions[i]:
-            print("       " + q(C.G3, descriptions[i]))
+            print("       " + q(C.W, descriptions[i]))
     
     print()
-    print("  " + q(C.G2, f"Select [1-{len(options)}]:") + "  ", end="", flush=True)
+    print("  " + q(C.W, f"Select [1-{len(options)}]:") + "  ", end="", flush=True)
     
     try:
         v = input().strip()
@@ -1231,7 +1245,7 @@ def _raw_input_unix():
         def __init__(self):
             self.fd = sys.stdin.fileno()
             self.old = termios.tcgetattr(self.fd)
-            tty.setraw(self.fd)
+            tty.setraw(sys.stdin.fileno())
             new = termios.tcgetattr(self.fd)
             new[6][termios.VMIN] = 1
             new[6][termios.VTIME] = 0
@@ -1242,10 +1256,10 @@ def _raw_input_unix():
             if not ch:
                 return ""
             if ch == b"\x1b":
-                if select.select([self.fd], [], [], 0.001)[0]:
+                if select.select([self.fd], [], [], 0)[0]:
                     ch2 = os.read(self.fd, 1)
                     if ch2 == b"[":
-                        if select.select([self.fd], [], [], 0.001)[0]:
+                        if select.select([self.fd], [], [], 0)[0]:
                             ch3 = os.read(self.fd, 1)
                             if ch3 == b"A": return "UP"
                             if ch3 == b"B": return "DOWN"
@@ -1322,10 +1336,11 @@ def _select_multi(options, title="", selected=None, descriptions=None):
     
     if not _is_tty():
         # Fallback
-        print("  " + q(C.G2, title or "Select options (comma-separated):"))
+        _render_reset()
+        print("  " + q(C.W, title or "Select options (comma-separated):"))
         for i, opt in enumerate(options):
             mark = "[x]" if i in selected else "[ ]"
-            print(f"  {i + 1}. {mark} {opt}")
+            print("  " + q(C.W, f"{i + 1}. {mark} {opt}"))
         
         try:
             v = input("  Numbers: ").strip()
@@ -1336,24 +1351,25 @@ def _select_multi(options, title="", selected=None, descriptions=None):
     def draw(first=False):
         lines = (1 if title else 0) + 2 + len(options) + 2
         out = []
+        _render_reset()
         
         if not first:
             out.append(f"\033[{lines}A\033[J")
         
         if title:
-            out.append("  " + q(C.G2, title) + "\n")
+            out.append("  " + q(C.W, title) + "\n")
         
         out.append("\n")
-        out.append("  " + q(C.G3, "↑↓ navigate · Space toggle · Enter confirm") + "\n")
+        out.append("  " + q(C.W, "↑↓ navigate · Space toggle · Enter confirm") + "\n")
         out.append("\n")
         
         for i, opt in enumerate(options):
-            check = q(C.GRN, "●") if i in selected else q(C.G3, "○")
+            check = q(C.W, "●") if i in selected else q(C.W, "○")
             if i == current:
-                out.append("  " + q(C.B6, "▸", bold=True) + " " + check + "  " +
+                out.append("  " + q(C.GLD_BRIGHT, ">", bold=True) + " " + check + "  " +
                            q(C.W, opt, bold=True) + "\n")
             else:
-                out.append("    " + check + "  " + q(C.G2, opt) + "\n")
+                out.append("    " + check + "  " + q(C.W, opt) + "\n")
         
         out.append("\n")
         sys.stdout.write("".join(out))
@@ -1413,6 +1429,7 @@ def step_header(current, total, title, subtitle=""):
     """
     Step progress header for multi-step wizards.
     """
+    _render_reset()
     print()
     
     # Progress bar
@@ -3551,12 +3568,18 @@ def cmd_run(args):
         if any(p.search(command) for p in SENSITIVE_CMD_PATTERNS):
             warn(f"Sensitive command detected: {command}")
             return
+
+        try:
+            command_argv = shlex.split(command)
+        except ValueError:
+            warn(f"Invalid command syntax: {command}")
+            return
         
         local_decision = local_policy_decision(command)
         if local_decision:
             ok(f"Approved (local): {command}")
             if execute:
-                subprocess.run(command, shell=True)
+                subprocess.run(command_argv)
             return
         
         if not token_default:
@@ -3577,7 +3600,7 @@ def cmd_run(args):
         if result.get("verdict") == "APPROVED":
             ok(f"Approved: {command}")
             if execute:
-                subprocess.run(command, shell=True)
+                subprocess.run(command_argv)
         else:
             warn(f"Blocked: {command} ({result.get('verdict')})")
     
