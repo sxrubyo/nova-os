@@ -3019,9 +3019,9 @@ def animate_agent_wake():
     time.sleep(0.2)
     
     # Secondary context
-    ghost_write("  I'm your governance layer.", color=C.G1, delay=0.018)
-    ghost_write("  Every action your agents take passes through me.", color=C.G1, delay=0.018)
-    ghost_write("  I approve, block, or escalate — and I remember everything.", color=C.G1, delay=0.018)
+    ghost_write("  I'm your governance layer.", color=C.W, delay=0.018)
+    ghost_write("  Every action your agents take passes through me.", color=C.W, delay=0.018)
+    ghost_write("  I approve, block, or escalate — and I remember everything.", color=C.W, delay=0.018)
     
     print()
     hr_bold()
@@ -3093,11 +3093,11 @@ def cmd_init(args):
     print("  " + q(C.W, "  │"))
     print("  " + q(C.W, "  │   " + L["how_step_2"]))
     print("  " + q(C.W, "  │"))
-    print("  " + q(C.W, "  ├─  ") + q(C.GRN, "Score ≥ 70", bold=True) + 
+    print("  " + q(C.W, "  ├─  ") + q(C.W, "Score ≥ 70", bold=True) + 
           q(C.W, f"  →  ✓  {L['how_approved']}"))
-    print("  " + q(C.W, "  ├─  ") + q(C.YLW, "Score 40-70", bold=True) + 
+    print("  " + q(C.W, "  ├─  ") + q(C.W, "Score 40-70", bold=True) + 
           q(C.W, f"  →  ⚠  {L['how_escalated']}"))
-    print("  " + q(C.W, "  └─  ") + q(C.RED, "Score < 40", bold=True) + 
+    print("  " + q(C.W, "  └─  ") + q(C.W, "Score < 40", bold=True) + 
           q(C.W, f"   →  ✗  {L['how_blocked']}"))
     print()
     print("  " + q(C.W, f"  {L['ledger_desc']}"))
@@ -3119,7 +3119,7 @@ def cmd_init(args):
     
     print()
     print("  " + q(C.W, f"     {L['terms_label']}  ") + 
-          q(C.B7, "https://nova-os.com/terms", underline=True))
+          q(C.W, "https://nova-os.com/terms", underline=True))
     print()
     
     print("  " + q(C.W, f"  {L['terms_question']}"))
@@ -3134,7 +3134,7 @@ def cmd_init(args):
     if terms_idx != 0:
         print()
         warn(L["setup_cancelled"])
-        hint("Run  " + q(C.B7, "nova init") + "  when ready.")
+        hint("Run  " + q(C.W, "nova init") + "  when ready.")
         print()
         return
     
@@ -3159,7 +3159,7 @@ def cmd_init(args):
     print("  " + q(C.W, f"  {L['apikey_sub']}"))
     print()
     print("  " + q(C.W, "  Docs: ") +
-          q(C.B7, "https://github.com/Nova/nova-os", underline=True))
+          q(C.W, "https://github.com/Nova/nova-os", underline=True))
     print()
     
     existing_key = cfg.get("api_key", "") or get_active_key()
@@ -3196,7 +3196,7 @@ def cmd_init(args):
         print()
         print("  " + q(C.W, "Your API key:"))
         print()
-        print("    " + q(C.B7, api_key, bold=True))
+        print("    " + q(C.W, api_key, bold=True))
         print()
         warn(L["apikey_warning"])
         print()
@@ -3225,7 +3225,7 @@ def cmd_init(args):
             print()
             warn("No key entered — generated one automatically")
             print()
-            print("    " + q(C.B7, api_key, bold=True))
+            print("    " + q(C.W, api_key, bold=True))
             print()
     
     else:
@@ -3295,7 +3295,7 @@ def cmd_init(args):
     else:
         fail(format_api_error(health, L["connection_failed"]))
         print()
-        warn(f"{L['config_saved']}. Fix server and run " + q(C.B7, "nova status"))
+        warn(f"{L['config_saved']}. Fix server and run " + q(C.W, "nova status"))
         print()
         hr_bold()
         print("  " + q(C.ORG, "✦", bold=True) + "  " + q(C.W, L["offline_title"], bold=True))
@@ -3370,7 +3370,7 @@ def cmd_init(args):
     ]
     
     for cmd, desc in next_cmds:
-        print("    " + q(C.B7, cmd.ljust(22), bold=True) + q(C.W, desc))
+        print("    " + q(C.W, cmd.ljust(22), bold=True) + q(C.W, desc))
     
     print()
     
@@ -3399,19 +3399,19 @@ def cmd_status(args):
         if queue:
             print()
             warn(f"{len(queue)} actions queued offline")
-            hint("Run  " + q(C.B7, "nova sync") + "  when server is back")
+            hint("Run  " + q(C.W, "nova sync") + "  when server is back")
         print()
         return
     
     # Server info
-    status_label = q(C.GRN, "Operational")
+    status_label = q(C.W, "Operational")
     if health.get("status") == "degraded":
         status_label = q(C.YLW, "Degraded")
     if health.get("status") == "down":
         status_label = q(C.RED, "Down")
     
     server_rows = [
-        ["URL", q(C.B7, cfg["api_url"])],
+        ["URL", q(C.W, cfg["api_url"])],
         ["Status", status_label],
     ]
     if health.get("version"):
@@ -3421,10 +3421,10 @@ def cmd_status(args):
     if health.get("environment"):
         server_rows.append(["Environment", q(C.W, str(health["environment"]))])
     if health.get("database"):
-        db_color = C.GRN if health["database"] == "connected" else C.RED
+        db_color = C.W if health["database"] == "connected" else C.RED
         server_rows.append(["Database", q(db_color, health["database"])])
     if health.get("llm_available") is not None:
-        llm_color = C.GRN if health["llm_available"] else C.W
+        llm_color = C.W if health["llm_available"] else C.W
         server_rows.append(["LLM", q(llm_color, "available" if health["llm_available"] else "disabled")])
     if api.last_latency:
         server_rows.append(["Latency", q(C.W, f"{api.last_latency}ms")])
@@ -3444,10 +3444,10 @@ def cmd_status(args):
         
         activity_rows = [
             ["Total actions", f"{total:,}"],
-            ["Approved", q(C.GRN, f"{approved:,}")],
-            ["Blocked", q(C.RED if blocked > 0 else C.W, f"{blocked:,}")],
-            ["Escalated", q(C.YLW if escalated > 0 else C.W, f"{escalated:,}")],
-            ["Duplicates blocked", q(C.ORG if duplicates > 0 else C.W, f"{duplicates:,}")],
+            ["Approved", q(C.W, f"{approved:,}")],
+            ["Blocked", q(C.W, f"{blocked:,}")],
+            ["Escalated", q(C.W, f"{escalated:,}")],
+            ["Duplicates blocked", q(C.W, f"{duplicates:,}")],
             ["Approval rate", f"{rate}%"],
         ]
         
@@ -3460,10 +3460,10 @@ def cmd_status(args):
         alerts = stats.get("alerts_pending", 0)
         
         resource_rows = [
-            ["Active agents", q(C.B7, str(agents))],
-            ["Memories stored", q(C.B6, f"{memories:,}")],
+            ["Active agents", q(C.W, str(agents))],
+            ["Memories stored", q(C.W, f"{memories:,}")],
             ["Avg score", str(avg_score)],
-            ["Pending alerts", q(C.YLW if alerts > 0 else C.W, str(alerts))],
+            ["Pending alerts", q(C.W, str(alerts))],
         ]
         
         render_table("Resources", ["Metric", "Value"], resource_rows)
@@ -3501,7 +3501,7 @@ def cmd_status(args):
         new_version = check_for_updates()
         if new_version:
             print()
-            info(f"Nova {q(C.B7, new_version)} available")
+            print("  " + q(C.W, f"Nova {new_version} available"))
             dim("Run: pip install --upgrade nova-cli")
     
     print()
@@ -5800,7 +5800,7 @@ def cmd_help(args=None):
         print()
         
         for cmd, desc in commands:
-            print("    " + q(C.B7, cmd.ljust(20), bold=True) + q(C.W, desc))
+            print("    " + q(C.W, cmd.ljust(20), bold=True) + q(C.W, desc))
         
         print()
     
@@ -5835,7 +5835,7 @@ def cmd_help(args=None):
     
     # Links
     print("  " + q(C.W, "Docs: ") + 
-          q(C.B7, "https://github.com/Nova/nova-os", underline=True))
+          q(C.W, "https://github.com/Nova/nova-os", underline=True))
     print()
 
 
