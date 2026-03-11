@@ -9,7 +9,7 @@ At Nova OS, security is not a feature—it is our core identity. This document o
 
 ## 🚨 Reporting a Vulnerability
 We take security issues seriously. If you discover a vulnerability, please do not open a public issue. Instead, follow this process:
-1. **Report**: Send an encrypted email to `enterprise@nova-os.com`.
+1. **Report**: Send an encrypted email to `sxrubyo@gmail.com`.
 2. **Verification**: Our team will acknowledge the receipt within 24 hours.
 3. **Disclosure**: We will work with you to patch the issue before a public disclosure is made.
 
