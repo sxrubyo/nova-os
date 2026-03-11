@@ -27,6 +27,7 @@ import re
 import shutil
 import platform
 import subprocess
+import shlex
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -153,6 +154,7 @@ class C:
     CYN  = _e("38;5;109")  # Muted info
     PNK  = _e("38;5;174")  # Muted accent
     GLD  = _e("38;5;179")  # Muted gold
+    GLD_BRIGHT = _e("93")  # Bright gold (ANSI)
     
     # Backgrounds (use sparingly)
     BG_RED = _e("48;5;167")
@@ -197,7 +199,7 @@ _NOVA_BLOCK = [
     "  ██║ ╚████║ ╚██████╔╝  ╚████╔╝  ██║  ██║ ",
     "  ╚═╝  ╚═══╝  ╚═════╝    ╚═══╝   ╚═╝  ╚═╝ ",
 ]
-_NOVA_COLORS = [C.B1, C.B2, C.B4, C.B5, C.B6, C.B7]
+_NOVA_COLORS = [C.GLD_BRIGHT, C.GLD_BRIGHT, C.GLD_BRIGHT, C.GLD_BRIGHT, C.GLD_BRIGHT, C.GLD_BRIGHT]
 
 _CLI_BLOCK = [
     " ██████╗██╗     ██╗",
@@ -513,15 +515,13 @@ def print_logo(tagline=True, compact=False, animated=False, minimal=False):
     print()
     
     if minimal:
-        print("  " + q(C.GLD, "✦", bold=True))
+        print("  " + q(C.GLD_BRIGHT, "✦", bold=True))
         return
     
     if compact:
         # Single line compact version
-        print("  " + q(C.GLD, "✦", bold=True) + "  " + q(C.W, "nova", bold=True) +
-              q(C.G2, f"  ·  v{NOVA_VERSION}") + 
-              q(C.G3, f"  ·  {NOVA_CODENAME}") +
-              q(C.G3, "  ·  @sxrubyo"))
+        banner = f"✦ nova · v{NOVA_VERSION} · @sxrubyo"
+        print("  " + q(C.GLD_BRIGHT, banner, bold=True))
         print()
         return
     
@@ -532,7 +532,7 @@ def print_logo(tagline=True, compact=False, animated=False, minimal=False):
         
         # Premium star on designated line
         if i == _STAR_LINE:
-            star = "  " + q(C.GLD, "✦", bold=True)
+            star = "  " + q(C.GLD_BRIGHT, "✦", bold=True)
         else:
             star = "   "
         
@@ -548,7 +548,7 @@ def print_logo(tagline=True, compact=False, animated=False, minimal=False):
             ghost_write(tl, color=C.G2, delay=0.01)
         else:
             print("  " + q(C.G2, tl))
-        print("  " + q(C.B7, "@sxrubyo"))
+        print("  " + q(C.GLD_BRIGHT, "@sxrubyo"))
         print("  " + q(C.G3, "─" * 62))
     
     print()
@@ -557,7 +557,7 @@ def print_logo(tagline=True, compact=False, animated=False, minimal=False):
 def print_mark():
     """Print just the nova mark for sub-screens."""
     print()
-    print("  " + q(C.GLD, "✦", bold=True) + "  " + q(C.W, "nova", bold=True))
+    print("  " + q(C.GLD_BRIGHT, "✦", bold=True) + "  " + q(C.W, "nova", bold=True))
     print()
 
 
@@ -3467,10 +3467,21 @@ def cmd_status(args):
 
 
 def _extract_run_command():
+    raw = []
     if "--" in sys.argv:
         idx = sys.argv.index("--")
-        return sys.argv[idx + 1:]
-    return []
+        raw = sys.argv[idx + 1:]
+    elif "run" in sys.argv:
+        idx = sys.argv.index("run")
+        raw = sys.argv[idx + 1:]
+    
+    if not raw:
+        return []
+    
+    if len(raw) == 1:
+        return shlex.split(raw[0])
+    
+    return raw
 
 
 def _proposed_command(line):
@@ -5721,15 +5732,19 @@ def cmd_help(args=None):
             ("skill add <name>", "Install a skill"),
             ("skill info <name>", "View skill details"),
         ]),
+        ("GOBERNANZA", [
+            ("run", "wrapper"),
+            ("shield", "proxy"),
+            ("scout", "security scan"),
+        ]),
+        ("TOOLS", [
+            ("doctor", "repair"),
+            ("mcp", "export/import"),
+        ]),
         ("System", [
             ("sync", "Process offline queue"),
             ("seed", "Load demo data"),
             ("alerts", "View pending alerts"),
-            ("run", "Wrap external process execution"),
-            ("shield", "Proxy validation for external agents"),
-            ("scout", "Scan skills for exfil signals"),
-            ("doctor", "Auto-repair config & permissions"),
-            ("mcp", "Export skills in MCP format"),
         ]),
     ]
     
