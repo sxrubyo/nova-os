@@ -1074,10 +1074,10 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
                 if filter_text.lower() in opt.lower()]
     
     def draw(first=False):
-        """Render the selector."""
+        """Render the selector. Uses cursor save/restore — no line counting."""
         nonlocal scroll_offset
         filtered = get_filtered_indices()
-        
+
         # Adjust scroll
         if filtered:
             vis_idx = filtered.index(current) if current in filtered else 0
@@ -1085,71 +1085,59 @@ def _select(options, title="", default=0, descriptions=None, show_index=False,
                 scroll_offset = vis_idx
             elif vis_idx >= scroll_offset + page_size:
                 scroll_offset = vis_idx - page_size + 1
-        
-        # Calculate lines to clear — must match EXACTLY what we print
-        lines_per_opt = 2 if descriptions else 1
-        visible_opts  = min(len(filtered), page_size)
-        scroll_up     = 1 if scroll_offset > 0 else 0
-        scroll_down   = 1 if (scroll_offset + page_size < len(filtered)) else 0
-        total_lines   = (
-            (1 if title else 0) +
-            (1 if allow_filter else 0) +
-            1 +                                # spacer after header
-            (visible_opts * lines_per_opt) +
-            scroll_up + scroll_down +
-            1                                  # trailing newline
-        )
-        
+
         out = []
-        
+
         if not first:
-            out.append(f"\033[{total_lines}A\033[J")
-        
+            # Restore saved cursor position, then erase everything below
+            out.append("\0338\033[J")
+        else:
+            # Save cursor position before first draw
+            out.append("\0337")
+
         # Title
         if title:
             out.append("  " + q(C.G2, title) + "\n")
-        
+
         # Filter input
         if allow_filter:
             filter_display = filter_text if filter_text else q(C.G3, "type to filter...")
             out.append("  " + q(C.B6, "/") + " " + filter_display + "\n")
-        
+
         out.append("\n")
-        
+
         # Options
         visible_items = filtered[scroll_offset:scroll_offset + page_size]
-        
+
         for display_idx, opt_idx in enumerate(visible_items):
             opt = options[opt_idx]
             is_selected = (opt_idx == current)
-            
-            # Index prefix
+
             idx_str = ""
             if show_index:
                 idx_str = q(C.G3, f"[{opt_idx + 1}]") + "  "
-            
+
             if is_selected:
-                out.append("  " + q(C.B6, "▸", bold=True) + "  " + idx_str +
+                out.append("  " + q(C.B6, "\u25b8", bold=True) + "  " + idx_str +
                            q(C.W, opt, bold=True) + "\n")
             else:
                 out.append("     " + idx_str + q(C.G2, opt) + "\n")
-            
-            # Description
+
             if descriptions and opt_idx < len(descriptions) and descriptions[opt_idx]:
                 desc = descriptions[opt_idx]
                 desc_color = C.G2 if is_selected else C.G3
                 out.append("       " + q(desc_color, desc) + "\n")
-        
-        # Scroll indicators
+
         if scroll_offset > 0:
-            out.append("       " + q(C.G3, "↑ more above") + "\n")
+            out.append("       " + q(C.G3, "\u2191 more above") + "\n")
         if scroll_offset + page_size < len(filtered):
-            out.append("       " + q(C.G3, "↓ more below") + "\n")
-        
+            out.append("       " + q(C.G3, "\u2193 more below") + "\n")
+
         out.append("\n")
-        
+
         sys.stdout.write("".join(out))
         sys.stdout.flush()
+
     
     # Key reading — inline so `current` stays in _select scope
     if IS_WINDOWS:
